@@ -1,0 +1,73 @@
+apply_settings:
+  target:
+    entity:
+      integration: haier_hon_kzw
+      domain: climate
+  fields:
+    hvac_mode:
+      selector:
+        select:
+          translation_key: hvac_mode
+          options:
+            - "off"
+            - "heat"
+            - "cool"
+            - "heat_cool"
+            - "dry"
+            - "fan_only"
+    temperature:
+      selector:
+        number:
+          min: 16
+          max: 30
+          step: 1
+          unit_of_measurement: "°C"
+    fan_mode:
+      selector:
+        select:
+          translation_key: fan_mode
+          options:
+            - "quiet"
+            - "auto"
+            - "low"
+            - "medium"
+            - "high"
+            - "turbo"
+    preset_mode:
+      selector:
+        select:
+          translation_key: preset_mode
+          options:
+            - "none"
+            - "sleep"
+            - "away"
+    vertical_position:
+      selector:
+        select:
+          translation_key: vertical_position
+          options:
+            - "max_up"
+            - "up"
+            - "center"
+            - "down"
+            - "max_down"
+            - "health_up"
+            - "health_down"
+            - "swing"
+    horizontal_position:
+      selector:
+        select:
+          translation_key: horizontal_position
+          options:
+            - "max_left"
+            - "left"
+            - "center"
+            - "right"
+            - "max_right"
+            - "swing"
+    display:
+      selector:
+        boolean:
+    health:
+      selector:
+        boolean:

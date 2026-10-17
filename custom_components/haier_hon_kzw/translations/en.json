@@ -182,6 +182,100 @@
     },
     "not_ready": {
       "message": "Wi-Fi key {host} is not answering right now."
+    },
+    "no_settings": {
+      "message": "Choose at least one setting to apply."
+    }
+  },
+  "selector": {
+    "hvac_mode": {
+      "options": {
+        "off": "Off",
+        "heat": "Heat",
+        "cool": "Cool",
+        "heat_cool": "Auto",
+        "dry": "Dry",
+        "fan_only": "Fan only"
+      }
+    },
+    "fan_mode": {
+      "options": {
+        "quiet": "Quiet",
+        "auto": "Auto",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "turbo": "Turbo"
+      }
+    },
+    "preset_mode": {
+      "options": {
+        "none": "None",
+        "sleep": "Sleep",
+        "away": "Frost protection 10 °C"
+      }
+    },
+    "vertical_position": {
+      "options": {
+        "max_up": "Highest",
+        "up": "Up",
+        "center": "Middle",
+        "down": "Down",
+        "max_down": "Lowest",
+        "health_up": "Up (health)",
+        "health_down": "Down (health)",
+        "swing": "Swing"
+      }
+    },
+    "horizontal_position": {
+      "options": {
+        "max_left": "Far left",
+        "left": "Left",
+        "center": "Middle",
+        "right": "Right",
+        "max_right": "Far right",
+        "swing": "Swing"
+      }
+    }
+  },
+  "services": {
+    "apply_settings": {
+      "name": "Apply settings",
+      "description": "Sets several settings in one command (a single beep). Settings left empty are not changed.",
+      "fields": {
+        "hvac_mode": {
+          "name": "Mode",
+          "description": "Off, heat, cool, auto, dry or fan only."
+        },
+        "temperature": {
+          "name": "Target temperature",
+          "description": "In °C."
+        },
+        "fan_mode": {
+          "name": "Fan",
+          "description": "Quiet, auto, low, medium, high or turbo (quiet and turbo are not available in fan only mode)."
+        },
+        "preset_mode": {
+          "name": "Preset",
+          "description": "Sleep, or frost protection 10 °C (heat mode only)."
+        },
+        "vertical_position": {
+          "name": "Vertical position",
+          "description": "A fixed position, or swing."
+        },
+        "horizontal_position": {
+          "name": "Horizontal position",
+          "description": "A fixed position, or swing."
+        },
+        "display": {
+          "name": "Display",
+          "description": "Turns the indoor unit display on or off."
+        },
+        "health": {
+          "name": "Ionizer (health)",
+          "description": "Turns the ionizer on or off."
+        }
+      }
     }
   }
 }

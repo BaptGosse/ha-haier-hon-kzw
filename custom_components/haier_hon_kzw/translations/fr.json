@@ -182,6 +182,100 @@
     },
     "not_ready": {
       "message": "La clé wifi {host} ne répond pas pour le moment."
+    },
+    "no_settings": {
+      "message": "Choisissez au moins un réglage à appliquer."
+    }
+  },
+  "selector": {
+    "hvac_mode": {
+      "options": {
+        "off": "Arrêt",
+        "heat": "Chauffage",
+        "cool": "Froid",
+        "heat_cool": "Auto",
+        "dry": "Déshumidification",
+        "fan_only": "Ventilation seule"
+      }
+    },
+    "fan_mode": {
+      "options": {
+        "quiet": "Silencieux",
+        "auto": "Auto",
+        "low": "Faible",
+        "medium": "Moyenne",
+        "high": "Forte",
+        "turbo": "Turbo"
+      }
+    },
+    "preset_mode": {
+      "options": {
+        "none": "Aucun",
+        "sleep": "Nuit",
+        "away": "Hors-gel 10 °C"
+      }
+    },
+    "vertical_position": {
+      "options": {
+        "max_up": "Tout en haut",
+        "up": "Haut",
+        "center": "Milieu",
+        "down": "Bas",
+        "max_down": "Tout en bas",
+        "health_up": "Haut (santé)",
+        "health_down": "Bas (santé)",
+        "swing": "Balayage"
+      }
+    },
+    "horizontal_position": {
+      "options": {
+        "max_left": "Tout à gauche",
+        "left": "Gauche",
+        "center": "Milieu",
+        "right": "Droite",
+        "max_right": "Tout à droite",
+        "swing": "Balayage"
+      }
+    }
+  },
+  "services": {
+    "apply_settings": {
+      "name": "Appliquer des réglages",
+      "description": "Applique plusieurs réglages en une seule commande (un seul bip). Les réglages laissés vides ne changent pas.",
+      "fields": {
+        "hvac_mode": {
+          "name": "Mode",
+          "description": "Arrêt, chauffage, froid, auto, déshumidification ou ventilation seule."
+        },
+        "temperature": {
+          "name": "Consigne",
+          "description": "En °C."
+        },
+        "fan_mode": {
+          "name": "Ventilation",
+          "description": "Silencieux, auto, faible, moyenne, forte ou turbo (silencieux et turbo n'existent pas en ventilation seule)."
+        },
+        "preset_mode": {
+          "name": "Préréglage",
+          "description": "Nuit, ou hors-gel 10 °C (en chauffage seulement)."
+        },
+        "vertical_position": {
+          "name": "Position verticale",
+          "description": "Une position fixe, ou le balayage."
+        },
+        "horizontal_position": {
+          "name": "Position horizontale",
+          "description": "Une position fixe, ou le balayage."
+        },
+        "display": {
+          "name": "Écran",
+          "description": "Allume ou éteint l'écran de l'unité intérieure."
+        },
+        "health": {
+          "name": "Ioniseur (santé)",
+          "description": "Allume ou éteint l'ioniseur."
+        }
+      }
     }
   }
 }

@@ -45,6 +45,10 @@ MAX_BACKOFF = 60.0
 # A brief reconnect keeps the entity available; it only turns unavailable after this long offline.
 # Shared Wi-Fi/NAT hiccups drop every key for a few seconds, which should not flap the dashboard.
 AVAILABILITY_GRACE = 90.0
+# A command sent while reconnecting waits for the key (scheduled commands must not be lost),
+# then it is sent once more if the key did not answer: commands are absolute, so resending is safe.
+COMMAND_RECONNECT_WAIT = 30.0
+COMMAND_ATTEMPTS = 2
 
 
 class CommandError(Exception):
@@ -74,6 +78,8 @@ class HonKzwClient:
         self._lock = asyncio.Lock()
         self._seq = 0
         self._ready = asyncio.Event()
+        self._connected = asyncio.Event()
+        self._wake = asyncio.Event()  # a waiting command cuts the reconnect backoff short
         self._closing = False
         self._backoff = 5.0
         self._offline_since: float | None = None
@@ -114,14 +120,20 @@ class HonKzwClient:
                 self._offline_since = now
             if now - self._offline_since >= AVAILABILITY_GRACE:
                 self._set_available(False)
-            await asyncio.sleep(self._backoff)
+            self._wake.clear()
+            try:
+                await asyncio.wait_for(self._wake.wait(), self._backoff)
+            except asyncio.TimeoutError:
+                pass
             self._backoff = min(self._backoff * 2, MAX_BACKOFF)
 
     async def stop(self) -> None:
         self._closing = True
+        self._wake.set()
         self._teardown()
 
     def _teardown(self) -> None:
+        self._connected.clear()
         if self._writer is not None:
             self._writer.close()
             self._writer = None
@@ -137,6 +149,7 @@ class HonKzwClient:
             asyncio.open_connection(self.host, self.port), CONNECT_TIMEOUT
         )
         _LOGGER.debug("%s: connected", self.host)
+        self._connected.set()
         poller = asyncio.create_task(self._poll())
         try:
             parser = KzwStreamParser()
@@ -233,10 +246,20 @@ class HonKzwClient:
 
     # commands
     async def _command(self, hon: bytes) -> None:
-        try:
-            msg = await self._request(hon)
-        except (ConnectionError, asyncio.TimeoutError) as err:
-            raise CommandError(str(err) or "no answer") from err
+        for attempt in range(1, COMMAND_ATTEMPTS + 1):
+            if not self._connected.is_set():
+                self._wake.set()
+                try:
+                    await asyncio.wait_for(self._connected.wait(), COMMAND_RECONNECT_WAIT)
+                except asyncio.TimeoutError as err:
+                    raise CommandError("the key is not reachable") from err
+            try:
+                msg = await self._request(hon)
+                break
+            except (ConnectionError, asyncio.TimeoutError) as err:
+                if attempt == COMMAND_ATTEMPTS or self._closing:
+                    raise CommandError(str(err) or "no answer") from err
+                _LOGGER.debug("%s: command not answered (%r), sending it again", self.host, err)
         if not is_status(msg):
             # the reply should be the full status; ask for it if it was not
             await self._request(STATUS_QUERY)

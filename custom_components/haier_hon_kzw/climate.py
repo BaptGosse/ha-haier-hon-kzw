@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+import voluptuous as vol
 from homeassistant.components.climate import (
+    ATTR_FAN_MODE,
     ATTR_HVAC_MODE,
+    ATTR_PRESET_MODE,
     FAN_AUTO,
     FAN_HIGH,
     FAN_LOW,
@@ -22,7 +25,8 @@ from homeassistant.components.climate import (
 )
 from homeassistant.const import ATTR_TEMPERATURE, PRECISION_HALVES, PRECISION_WHOLE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import config_validation as cv, entity_platform
 
 from . import HonKzwConfigEntry
 from .client import CommandError
@@ -43,6 +47,7 @@ from .protocol import (
     MODE_HEALTHY_DRY,
     MODE_HEAT,
 )
+from .select import LOUVERS, SWING
 
 HVAC_TO_HON = {
     HVACMode.HEAT_COOL: MODE_AUTO,
@@ -65,10 +70,39 @@ HON_TO_FAN = {v: k for k, v in FAN_TO_HON.items()}
 # The remote's "auto" variants: quiet (silent) and auto with an up arrow (turbo)
 FAN_QUIET = "quiet"
 FAN_TURBO = "turbo"
+FAN_MODES = [FAN_QUIET, FAN_AUTO, FAN_LOW, FAN_MEDIUM, FAN_HIGH, FAN_TURBO]
+LOUVER_POSITIONS = {louver.key: louver.positions for louver in LOUVERS}  # vertical_position, horizontal_position
+
+SERVICE_APPLY_SETTINGS = "apply_settings"
+ATTR_DISPLAY = "display"
+ATTR_HEALTH = "health"
+# Every setting is optional; an empty value (None, as sent by schedulers for unset fields) means unchanged
+APPLY_SETTINGS_SCHEMA = {
+    vol.Optional(ATTR_HVAC_MODE): vol.Any(None, vol.In(["off", "heat", "cool", "heat_cool", "dry", "fan_only"])),
+    vol.Optional(ATTR_TEMPERATURE): vol.Any(
+        None, vol.All(vol.Coerce(float), vol.Range(min=MIN_TEMP, max=MAX_TEMP))
+    ),
+    vol.Optional(ATTR_FAN_MODE): vol.Any(None, vol.In(FAN_MODES)),
+    vol.Optional(ATTR_PRESET_MODE): vol.Any(None, vol.In([PRESET_NONE, PRESET_SLEEP, PRESET_AWAY])),
+    **{vol.Optional(key): vol.Any(None, vol.In(list(positions))) for key, positions in LOUVER_POSITIONS.items()},
+    vol.Optional(ATTR_DISPLAY): vol.Any(None, cv.boolean),
+    vol.Optional(ATTR_HEALTH): vol.Any(None, cv.boolean),
+}
+
+
+def _fan_changes(fan_mode: str) -> dict[str, Any]:
+    if fan_mode == FAN_QUIET:
+        return {"fan": HON_FAN_AUTO, "quiet": True, "turbo": False}
+    if fan_mode == FAN_TURBO:
+        return {"fan": HON_FAN_AUTO, "quiet": False, "turbo": True}
+    return {"fan": FAN_TO_HON[fan_mode], "quiet": False, "turbo": False}
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: HonKzwConfigEntry, async_add_entities) -> None:
     async_add_entities([HonKzwClimate(entry.runtime_data, entry)])
+    entity_platform.async_get_current_platform().async_register_entity_service(
+        SERVICE_APPLY_SETTINGS, APPLY_SETTINGS_SCHEMA, "async_apply_settings"
+    )
 
 
 class HonKzwClimate(HonKzwEntity, ClimateEntity):
@@ -163,7 +197,7 @@ class HonKzwClimate(HonKzwEntity, ClimateEntity):
         if self._client.status and self._client.status.mode == MODE_FAN:
             # no auto, quiet or turbo in fan-only mode
             return [FAN_LOW, FAN_MEDIUM, FAN_HIGH]
-        return [FAN_QUIET, FAN_AUTO, FAN_LOW, FAN_MEDIUM, FAN_HIGH, FAN_TURBO]
+        return FAN_MODES
 
     @property
     def fan_mode(self) -> str | None:
@@ -228,13 +262,7 @@ class HonKzwClimate(HonKzwEntity, ClimateEntity):
         await self._run(self._client.async_control(preset=preset_mode))
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
-        if fan_mode == FAN_QUIET:
-            changes = {"fan": HON_FAN_AUTO, "quiet": True, "turbo": False}
-        elif fan_mode == FAN_TURBO:
-            changes = {"fan": HON_FAN_AUTO, "quiet": False, "turbo": True}
-        else:
-            changes = {"fan": FAN_TO_HON[fan_mode], "quiet": False, "turbo": False}
-        await self._run(self._client.async_control(**changes))
+        await self._run(self._client.async_control(**_fan_changes(fan_mode)))
 
     async def async_set_swing_mode(self, swing_mode: str) -> None:
         await self._run(
@@ -243,3 +271,31 @@ class HonKzwClimate(HonKzwEntity, ClimateEntity):
                 horizontal_swing=swing_mode in (SWING_HORIZONTAL, SWING_BOTH),
             )
         )
+
+    async def async_apply_settings(self, **kwargs: Any) -> None:
+        """Apply several settings at once: a single command, so a single beep."""
+        changes: dict[str, Any] = {}
+        if (hvac_mode := kwargs.get(ATTR_HVAC_MODE)) is not None:
+            changes["power"] = hvac_mode != HVACMode.OFF
+            if hvac_mode != HVACMode.OFF:
+                changes["mode"] = HVAC_TO_HON[HVACMode(hvac_mode)]
+        if (temperature := kwargs.get(ATTR_TEMPERATURE)) is not None:
+            changes["target_temperature"] = temperature
+        if (fan_mode := kwargs.get(ATTR_FAN_MODE)) is not None:
+            changes.update(_fan_changes(fan_mode))
+        if (preset_mode := kwargs.get(ATTR_PRESET_MODE)) is not None:
+            changes["preset"] = preset_mode
+        for key, positions in LOUVER_POSITIONS.items():
+            if (option := kwargs.get(key)) is not None:
+                axis = key.removesuffix("_position")
+                if option == SWING:
+                    changes[f"{axis}_swing"] = True
+                else:
+                    changes[f"{axis}_position"] = positions[option]
+        if (display := kwargs.get(ATTR_DISPLAY)) is not None:
+            changes["display"] = display
+        if (health := kwargs.get(ATTR_HEALTH)) is not None:
+            changes["health"] = health
+        if not changes:
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="no_settings")
+        await self._run(self._client.async_control(**changes))

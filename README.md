@@ -36,7 +36,8 @@ this protocol directly:
   remote is used.
 - **Polling every 10 s**: the key drops an idle connection after about 17 s. Detailed data (power,
   compressor, coils) is read every 30 s.
-- **Automatic reconnection** when the key restarts (power cut…).
+- **Automatic reconnection** when the key restarts (power cut…). A command sent during a reconnection
+  waits for the key instead of being lost, and a command the key did not answer is sent once more.
 - **No change to the key**: no firmware update, no Wi-Fi reconfiguration.
 
 ## Compatibility
@@ -73,6 +74,56 @@ For each heat pump:
 Everything can be used in Home Assistant automations and scripts. For example, you can turn the
 heating on at a set time, lower the target temperature at night, mute the beeps in the evening, or
 get alerted when a unit reports an error code.
+
+## Applying several settings at once
+
+The **`haier_hon_kzw.apply_settings`** action sets any combination of mode, target temperature, fan,
+preset, louver positions, display and ionizer in **a single command**, so the unit beeps once.
+Settings that are left out (or empty) are not changed.
+
+```yaml
+action: haier_hon_kzw.apply_settings
+target:
+  entity_id: climate.living_room
+data:
+  hvac_mode: heat           # off, heat, cool, heat_cool, dry, fan_only
+  temperature: 21
+  fan_mode: turbo           # quiet, auto, low, medium, high, turbo
+  vertical_position: swing  # max_up, up, center, down, max_down, health_up, health_down, swing
+  horizontal_position: center
+  preset_mode: none         # none, sleep, away (frost protection, heat mode only)
+  display: false
+```
+
+### Schedules and daily curves
+
+With [Scheduler](https://github.com/nielsfaber/scheduler-component) and its
+[card](https://github.com/nielsfaber/scheduler-card), the action can be offered in the card. Each
+timeslot then applies several settings at once. In **scheme mode**, the day becomes a timeline of
+timeslots, which makes a curve: for example turbo fan from 6:30 to 7:00, then auto, and a target
+temperature that goes up in the morning and down at night.
+
+```yaml
+type: custom:scheduler-card
+include:
+  - climate.living_room
+customize:
+  climate.living_room:  # or "climate" to pick several units in the same schedule
+    actions:
+      - service: haier_hon_kzw.apply_settings
+        name: Settings
+        icon: mdi:tune-variant
+        variables:
+          hvac_mode:
+            name: Mode
+            options: [{value: "off", name: "Off"}, {value: heat, name: Heat}, {value: cool, name: Cool}]
+          temperature:  # a list rather than a number, so that it can stay empty
+            name: Target
+            options: [{value: "19", name: "19 °C"}, {value: "20", name: "20 °C"}, {value: "21", name: "21 °C"}]
+          fan_mode:
+            name: Fan
+            options: [{value: quiet, name: Quiet}, {value: auto, name: Auto}, {value: turbo, name: Turbo}]
+```
 
 ## Installation
 
