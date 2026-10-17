@@ -1,0 +1,22 @@
+{
+  "domain": "haier_hon_kzw",
+  "name": "Haier hOn local (KZW-W002 Wi-Fi key)",
+  "codeowners": [
+    "@BaptGosse"
+  ],
+  "config_flow": true,
+  "dhcp": [
+    {
+      "macaddress": "04E229*"
+    },
+    {
+      "macaddress": "2C37C5*"
+    }
+  ],
+  "documentation": "https://github.com/BaptGosse/ha-haier-hon-kzw",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/BaptGosse/ha-haier-hon-kzw/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

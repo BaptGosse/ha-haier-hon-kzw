@@ -1,0 +1,104 @@
+"""Config flow: manual (IP + MAC), DHCP discovery and IP reconfiguration."""
+from __future__ import annotations
+
+from typing import Any
+
+import voluptuous as vol
+
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.const import CONF_HOST, CONF_MAC, CONF_NAME
+from homeassistant.helpers.device_registry import format_mac
+from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
+
+from .client import async_probe
+from .const import DOMAIN
+from .protocol import ProtocolError, normalize_mac
+
+
+async def _probe_error(host: str, mac: str) -> str | None:
+    try:
+        await async_probe(host, mac)
+    except (OSError, TimeoutError):
+        return "cannot_connect"
+    except ProtocolError:
+        return "not_hon"
+    return None
+
+
+class HonKzwConfigFlow(ConfigFlow, domain=DOMAIN):
+    VERSION = 1
+
+    def __init__(self) -> None:
+        self._discovered: dict[str, str] = {}
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                mac = normalize_mac(user_input[CONF_MAC])
+            except ValueError:
+                errors[CONF_MAC] = "invalid_mac"
+            else:
+                await self.async_set_unique_id(mac)
+                self._abort_if_unique_id_configured(updates={CONF_HOST: user_input[CONF_HOST]})
+                if (error := await _probe_error(user_input[CONF_HOST], mac)) is None:
+                    return self.async_create_entry(
+                        title=user_input[CONF_NAME],
+                        data={CONF_HOST: user_input[CONF_HOST], CONF_MAC: mac},
+                    )
+                errors["base"] = error
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_NAME): str,
+                vol.Required(CONF_HOST): str,
+                vol.Required(CONF_MAC): str,
+            }
+        )
+        return self.async_show_form(
+            step_id="user",
+            data_schema=self.add_suggested_values_to_schema(schema, user_input or {}),
+            errors=errors,
+        )
+
+    async def async_step_dhcp(self, discovery_info: DhcpServiceInfo) -> ConfigFlowResult:
+        mac = normalize_mac(discovery_info.macaddress)
+        await self.async_set_unique_id(mac)
+        # A known key that changed IP is updated (and reloaded) here
+        self._abort_if_unique_id_configured(updates={CONF_HOST: discovery_info.ip})
+        # Haier MAC prefixes are shared with other appliances: only offer real keys
+        if await _probe_error(discovery_info.ip, mac) is not None:
+            return self.async_abort(reason="not_hon")
+        self._discovered = {CONF_HOST: discovery_info.ip, CONF_MAC: mac}
+        self.context["title_placeholders"] = {"host": discovery_info.ip}
+        return await self.async_step_discovery_confirm()
+
+    async def async_step_discovery_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(title=user_input[CONF_NAME], data=self._discovered)
+        return self.async_show_form(
+            step_id="discovery_confirm",
+            data_schema=vol.Schema({vol.Required(CONF_NAME): str}),
+            description_placeholders={
+                "host": self._discovered[CONF_HOST],
+                "mac": format_mac(self._discovered[CONF_MAC]),
+            },
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            if (error := await _probe_error(user_input[CONF_HOST], entry.data[CONF_MAC])) is None:
+                return self.async_update_reload_and_abort(
+                    entry, data_updates={CONF_HOST: user_input[CONF_HOST]}
+                )
+            errors["base"] = error
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema({vol.Required(CONF_HOST, default=entry.data[CONF_HOST]): str}),
+            errors=errors,
+        )

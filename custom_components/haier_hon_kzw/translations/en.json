@@ -1,0 +1,154 @@
+{
+  "config": {
+    "flow_title": "{host}",
+    "step": {
+      "user": {
+        "title": "Add a Haier / Thermor heat pump",
+        "description": "The original Wi-Fi key (KZW-W002) must be connected to the network. Its MAC address is listed in your router's device list.",
+        "data": {
+          "name": "Name (room)",
+          "host": "Wi-Fi key IP address",
+          "mac": "Wi-Fi key MAC address"
+        },
+        "data_description": {
+          "name": "The name shown in Home Assistant, usually the room it is in.",
+          "mac": "12 characters, with or without \":\"."
+        }
+      },
+      "discovery_confirm": {
+        "title": "Heat pump discovered",
+        "description": "A Haier Wi-Fi key was found at {host} (MAC {mac}). Give this heat pump a name (the room).",
+        "data": {
+          "name": "Name (room)"
+        }
+      },
+      "reconfigure": {
+        "title": "Change the IP address",
+        "data": {
+          "host": "Wi-Fi key IP address"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach the key on port 56800. Check the IP address.",
+      "not_hon": "The key answers but not with the hOn protocol: this unit is not supported.",
+      "invalid_mac": "Invalid MAC address (12 hexadecimal characters expected)."
+    },
+    "abort": {
+      "already_configured": "This heat pump is already configured.",
+      "not_hon": "This Haier device is not a supported heat pump.",
+      "reconfigure_successful": "IP address updated."
+    }
+  },
+  "entity": {
+    "climate": {
+      "air_conditioner": {
+        "state": {
+          "heat_cool": "Auto"
+        },
+        "state_attributes": {
+          "fan_mode": {
+            "name": "Fan",
+            "state": {
+              "quiet": "Quiet",
+              "auto": "Auto",
+              "low": "Low",
+              "medium": "Medium",
+              "high": "High",
+              "turbo": "Turbo"
+            }
+          },
+          "swing_mode": {
+            "name": "Swing",
+            "state": {
+              "off": "Off",
+              "vertical": "Vertical",
+              "horizontal": "Horizontal",
+              "both": "Both"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "room_temperature": {
+        "name": "Indoor temperature"
+      },
+      "outdoor_temperature": {
+        "name": "Outdoor temperature"
+      },
+      "error_code": {
+        "name": "Error code"
+      },
+      "power": {
+        "name": "Power"
+      },
+      "energy": {
+        "name": "Energy"
+      },
+      "compressor_frequency": {
+        "name": "Compressor frequency"
+      },
+      "compressor_current": {
+        "name": "Compressor current"
+      },
+      "indoor_coil_temperature": {
+        "name": "Indoor coil temperature"
+      },
+      "outdoor_coil_temperature": {
+        "name": "Outdoor coil temperature"
+      },
+      "outdoor_out_air_temperature": {
+        "name": "Outdoor exhaust air temperature"
+      },
+      "outdoor_defrost_temperature": {
+        "name": "Defrost temperature"
+      },
+      "expansion_valve": {
+        "name": "Expansion valve opening"
+      }
+    },
+    "select": {
+      "vertical_position": {
+        "name": "Vertical position",
+        "state": {
+          "max_up": "Highest",
+          "up": "Up",
+          "center": "Middle",
+          "down": "Down",
+          "max_down": "Lowest",
+          "health_up": "Up (health)",
+          "health_down": "Down (health)",
+          "swing": "Swing"
+        }
+      },
+      "horizontal_position": {
+        "name": "Horizontal position",
+        "state": {
+          "max_left": "Far left",
+          "left": "Left",
+          "center": "Middle",
+          "right": "Right",
+          "max_right": "Far right",
+          "swing": "Swing"
+        }
+      }
+    },
+    "switch": {
+      "display": {
+        "name": "Display"
+      },
+      "beeper": {
+        "name": "Command beep"
+      }
+    }
+  },
+  "exceptions": {
+    "command_failed": {
+      "message": "The heat pump did not answer the command ({error})."
+    },
+    "not_ready": {
+      "message": "Wi-Fi key {host} is not answering right now."
+    }
+  }
+}

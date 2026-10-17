@@ -1,0 +1,154 @@
+{
+  "config": {
+    "flow_title": "{host}",
+    "step": {
+      "user": {
+        "title": "Ajouter une pompe à chaleur Haier / Thermor",
+        "description": "La clé wifi d'origine (KZW-W002) doit être connectée au réseau. Son adresse MAC se trouve dans la liste des appareils de la box.",
+        "data": {
+          "name": "Nom (pièce)",
+          "host": "Adresse IP de la clé wifi",
+          "mac": "Adresse MAC de la clé wifi"
+        },
+        "data_description": {
+          "name": "Le nom affiché dans Home Assistant, en général celui de la pièce.",
+          "mac": "12 caractères, avec ou sans « : »."
+        }
+      },
+      "discovery_confirm": {
+        "title": "Pompe à chaleur découverte",
+        "description": "Une clé wifi Haier a été trouvée à l'adresse {host} (MAC {mac}). Donnez un nom à cette pompe à chaleur (la pièce).",
+        "data": {
+          "name": "Nom (pièce)"
+        }
+      },
+      "reconfigure": {
+        "title": "Changer l'adresse IP",
+        "data": {
+          "host": "Adresse IP de la clé wifi"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de joindre la clé sur le port 56800. Vérifiez l'adresse IP.",
+      "not_hon": "La clé répond mais pas en protocole hOn : cet appareil n'est pas pris en charge.",
+      "invalid_mac": "Adresse MAC invalide (12 caractères hexadécimaux attendus)."
+    },
+    "abort": {
+      "already_configured": "Cette pompe à chaleur est déjà configurée.",
+      "not_hon": "Cet appareil Haier n'est pas une pompe à chaleur compatible.",
+      "reconfigure_successful": "Adresse IP mise à jour."
+    }
+  },
+  "entity": {
+    "climate": {
+      "air_conditioner": {
+        "state": {
+          "heat_cool": "Auto"
+        },
+        "state_attributes": {
+          "fan_mode": {
+            "name": "Ventilation",
+            "state": {
+              "quiet": "Silencieux",
+              "auto": "Auto",
+              "low": "Faible",
+              "medium": "Moyenne",
+              "high": "Forte",
+              "turbo": "Turbo"
+            }
+          },
+          "swing_mode": {
+            "name": "Oscillation",
+            "state": {
+              "off": "Arrêt",
+              "vertical": "Verticale",
+              "horizontal": "Horizontale",
+              "both": "Les deux"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "room_temperature": {
+        "name": "Température intérieure"
+      },
+      "outdoor_temperature": {
+        "name": "Température extérieure"
+      },
+      "error_code": {
+        "name": "Code erreur"
+      },
+      "power": {
+        "name": "Puissance"
+      },
+      "energy": {
+        "name": "Énergie"
+      },
+      "compressor_frequency": {
+        "name": "Fréquence du compresseur"
+      },
+      "compressor_current": {
+        "name": "Courant du compresseur"
+      },
+      "indoor_coil_temperature": {
+        "name": "Température échangeur intérieur"
+      },
+      "outdoor_coil_temperature": {
+        "name": "Température échangeur extérieur"
+      },
+      "outdoor_out_air_temperature": {
+        "name": "Température air soufflé extérieur"
+      },
+      "outdoor_defrost_temperature": {
+        "name": "Température de dégivrage"
+      },
+      "expansion_valve": {
+        "name": "Ouverture vanne d'expansion"
+      }
+    },
+    "select": {
+      "vertical_position": {
+        "name": "Position verticale",
+        "state": {
+          "max_up": "Tout en haut",
+          "up": "Haut",
+          "center": "Milieu",
+          "down": "Bas",
+          "max_down": "Tout en bas",
+          "health_up": "Haut (santé)",
+          "health_down": "Bas (santé)",
+          "swing": "Balayage"
+        }
+      },
+      "horizontal_position": {
+        "name": "Position horizontale",
+        "state": {
+          "max_left": "Tout à gauche",
+          "left": "Gauche",
+          "center": "Milieu",
+          "right": "Droite",
+          "max_right": "Tout à droite",
+          "swing": "Balayage"
+        }
+      }
+    },
+    "switch": {
+      "display": {
+        "name": "Écran"
+      },
+      "beeper": {
+        "name": "Bip des commandes"
+      }
+    }
+  },
+  "exceptions": {
+    "command_failed": {
+      "message": "La pompe à chaleur n'a pas répondu à la commande ({error})."
+    },
+    "not_ready": {
+      "message": "La clé wifi {host} ne répond pas pour le moment."
+    }
+  }
+}
