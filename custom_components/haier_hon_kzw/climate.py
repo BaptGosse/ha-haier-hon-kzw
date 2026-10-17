@@ -8,6 +8,9 @@ from homeassistant.components.climate import (
     FAN_HIGH,
     FAN_LOW,
     FAN_MEDIUM,
+    PRESET_AWAY,
+    PRESET_NONE,
+    PRESET_SLEEP,
     SWING_BOTH,
     SWING_HORIZONTAL,
     SWING_OFF,
@@ -89,6 +92,7 @@ class HonKzwClimate(HonKzwEntity, ClimateEntity):
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.FAN_MODE
         | ClimateEntityFeature.SWING_MODE
+        | ClimateEntityFeature.PRESET_MODE
         | ClimateEntityFeature.TURN_ON
         | ClimateEntityFeature.TURN_OFF
     )
@@ -96,6 +100,24 @@ class HonKzwClimate(HonKzwEntity, ClimateEntity):
     def __init__(self, client, entry) -> None:
         super().__init__(client, entry)
         self._attr_unique_id = client.mac
+
+    @property
+    def preset_modes(self) -> list[str]:
+        # 10 °C frost protection only exists in heat mode
+        if self._client.status and self._client.status.mode == MODE_HEAT:
+            return [PRESET_NONE, PRESET_SLEEP, PRESET_AWAY]
+        return [PRESET_NONE, PRESET_SLEEP]
+
+    @property
+    def preset_mode(self) -> str | None:
+        status = self._client.status
+        if status is None:
+            return None
+        if status.ten_degree:
+            return PRESET_AWAY
+        if status.sleep:
+            return PRESET_SLEEP
+        return PRESET_NONE
 
     @property
     def hvac_mode(self) -> HVACMode | None:
@@ -201,6 +223,9 @@ class HonKzwClimate(HonKzwEntity, ClimateEntity):
                 changes["mode"] = HVAC_TO_HON[hvac_mode]
         if changes:
             await self._run(self._client.async_control(**changes))
+
+    async def async_set_preset_mode(self, preset_mode: str) -> None:
+        await self._run(self._client.async_control(preset=preset_mode))
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         if fan_mode == FAN_QUIET:

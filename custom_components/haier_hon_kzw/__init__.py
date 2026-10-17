@@ -9,7 +9,14 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from .client import HonKzwClient
 from .const import DOMAIN
 
-PLATFORMS = [Platform.CLIMATE, Platform.SELECT, Platform.SENSOR, Platform.SWITCH]
+PLATFORMS = [
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.CLIMATE,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+]
 
 type HonKzwConfigEntry = ConfigEntry[HonKzwClient]
 

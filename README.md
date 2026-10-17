@@ -42,7 +42,7 @@ this protocol directly:
 ## Compatibility
 
 | Hardware | Status |
-|---|---|
+|-|-|
 | Thermor Nagano (2021) + 0011800292K key | ✅ tested on 5 units |
 | Other Haier hOn unit with a KZW-W002 key on Wi-Fi | should work, feedback welcome |
 | Haier unit speaking SmartAir2 (older models) | ❌ see [ddnlv/haier-kzw-w002-local](https://github.com/ddnlv/haier-kzw-w002-local) |
@@ -56,16 +56,19 @@ unit is rejected with a clear message.
 For each heat pump:
 
 | Entity | Details |
-|---|---|
-| **Climate** | On/off, modes **Heat**, **Cool**, **Auto**, **Dry**, **Fan only**. Target from 16 to 30 °C. **Real action** (heating, cooling or idle), derived from the compressor. |
+|-|-|
+| **Climate** | On/off, modes **Heat**, **Cool**, **Auto**, **Dry**, **Fan only**. Target from 16 to 30 °C. Presets **Sleep** and **Frost protection 10 °C** (heat mode). **Real action** (heating, cooling or idle), derived from the compressor. |
 | **Fan** | **Quiet**, Auto, Low, Medium, High, **Turbo**. This covers the remote's "auto" variants. |
 | **Swing** | Off, Vertical, Horizontal, Both. |
 | **Louver position** | Vertical (highest to lowest, plus the "health" positions) and horizontal (far left to far right), set without swinging. |
-| **Display** | Turns the indoor unit's display on or off. No need for the remote after a power cut. |
+| **Display** | Turns the indoor unit's display on or off, silently. No need for the remote after a power cut. |
 | **Command beep** | Mutes the beep of commands sent by Home Assistant, handy at night. |
+| **Ionizer** and **Remote control lock** | The unit's "health" ionizer, and locking of the infrared remote. |
+| **Self cleaning** and **Steri cleaning 56 °C** | Buttons that start the indoor unit's cleaning cycles. |
+| **Filter needs cleaning**, **Cleaning running**, **Compressor** | On/off states for alerts and automations. |
 | **Temperatures** | Indoor, and outdoor (outdoor unit sensor). |
-| **Power (W)** and **Energy (kWh)** | Live and cumulative consumption, ready for the Home Assistant **Energy** dashboard. |
-| **Diagnostics** | Compressor frequency and current, coil, defrost and exhaust air temperatures, expansion valve opening, error code. Some of these entities are disabled by default. |
+| **Power (W)** and **Energy (kWh)** | Live and cumulative consumption, ready for the Home Assistant **Energy** dashboard, **when the unit reports it**. Thermor Nagano units leave this field at 0. The integration detects it (compressor running, 0 W) and marks both sensors unavailable instead of showing a false 0. Compressor frequency and coil temperatures stay available to build an estimate. |
+| **Diagnostics** | Compressor frequency and current, indoor and outdoor coil, defrost and compressor discharge temperatures, expansion valve opening, error code. |
 
 Everything can be used in Home Assistant automations and scripts. For example, you can turn the
 heating on at a set time, lower the target temperature at night, mute the beeps in the evening, or

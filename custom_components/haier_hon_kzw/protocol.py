@@ -212,6 +212,11 @@ class HonStatus:
     outdoor_temperature: int
     error: int
     big: HonBigData | None = None
+    ten_degree: bool = False  # 10 °C frost protection (heat mode)
+    lock_remote: bool = False
+    change_filter: bool = False
+    steri_cleaning: bool = False
+    self_cleaning: bool = False
 
     @property
     def vertical_swing_on(self) -> bool:
@@ -225,11 +230,11 @@ class HonStatus:
 @dataclass(frozen=True)
 class HonBigData:
     power: int  # W
-    indoor_coil_temperature: float
-    outdoor_out_air_temperature: int
-    outdoor_coil_temperature: int
-    outdoor_in_air_temperature: int
-    outdoor_defrost_temperature: int
+    indoor_coil_temperature: float | None  # None: no reading (raw 0)
+    outdoor_out_air_temperature: int | None
+    outdoor_coil_temperature: int | None
+    outdoor_in_air_temperature: int | None
+    outdoor_defrost_temperature: int | None
     compressor_frequency: int  # Hz
     compressor_current: float | None  # A, None when not reported
     outdoor_fan: int  # 0 off, 1 on, 2 not available
@@ -250,13 +255,17 @@ def is_status(msg: HonMessage) -> bool:
 
 def decode_big_data(b: bytes) -> HonBigData:
     current = int.from_bytes(b[8:10], "big")
+
+    def outdoor(raw: int) -> int | None:
+        return raw - 64 if raw else None  # 0 means "no reading" (-64 °C)
+
     return HonBigData(
         power=int.from_bytes(b[0:2], "big"),
-        indoor_coil_temperature=b[2] / 2 - 20,
-        outdoor_out_air_temperature=b[3] - 64,
-        outdoor_coil_temperature=b[4] - 64,
-        outdoor_in_air_temperature=b[5] - 64,
-        outdoor_defrost_temperature=b[6] - 64,
+        indoor_coil_temperature=b[2] / 2 - 20 if b[2] else None,
+        outdoor_out_air_temperature=outdoor(b[3]),
+        outdoor_coil_temperature=outdoor(b[4]),
+        outdoor_in_air_temperature=outdoor(b[5]),
+        outdoor_defrost_temperature=outdoor(b[6]),
         compressor_frequency=b[7],
         compressor_current=None if current >= 0x01FF else current / 10,
         outdoor_fan=b[10] & 0x03,
@@ -293,6 +302,11 @@ def decode_status(msg: HonMessage) -> HonStatus:
         big=decode_big_data(msg.payload[CONTROL_LEN + SENSORS_LEN:])
         if msg.subcommand == SUB_BIG_DATA_REPLY and len(msg.payload) >= CONTROL_LEN + SENSORS_LEN + BIG_DATA_LEN
         else None,
+        ten_degree=bool(c[4] & 0x01),
+        lock_remote=bool(c[5] & 0x40),
+        change_filter=bool(c[8] & 0x01),
+        steri_cleaning=bool(c[4] & 0x80),
+        self_cleaning=bool(c[9] & 0x10),
     )
 
 
@@ -314,6 +328,9 @@ def build_control(
     quiet: bool | None = None,
     turbo: bool | None = None,
     display: bool | None = None,
+    preset: str | None = None,  # "none", "sleep" or "away" (10 °C, heat only)
+    health: bool | None = None,
+    lock_remote: bool | None = None,
     fixed_vertical_position: int = SWING_V_CENTER,
     fixed_horizontal_position: int = SWING_H_CENTER,
     beeper: bool = True,
@@ -344,10 +361,26 @@ def build_control(
         c[1] = (c[1] & 0xF0) | (vertical_position & 0x0F)
     if horizontal_position is not None:
         c[7] = (c[7] & 0xF8) | (horizontal_position & 0x07)
-    # byte 4 must be cleared, then only display and half degree are set
     cur_display = status.display if display is None else display
-    c[4] = (0x02 if cur_display else 0) | (half << 2)
+    if preset == "away":
+        ten = 1
+    elif preset is not None:
+        ten = 0
+    else:
+        ten = 1 if status.ten_degree else 0
+    if not cur_power or cur_mode != MODE_HEAT:
+        ten = 0  # 10 °C mode only exists while heating
+    # byte 4 must be cleared, then only display, half degree and 10 °C are set
+    c[4] = (0x02 if cur_display else 0) | (half << 2) | ten
     flags = c[5] & ~0x01 & ~0x80
+    if preset == "sleep":
+        flags = (flags | 0x20) & ~0x08
+    elif preset is not None:
+        flags &= ~0x20
+    if health is not None:
+        flags = (flags | 0x02) if health else (flags & ~0x02)
+    if lock_remote is not None:
+        flags = (flags | 0x40) if lock_remote else (flags & ~0x40)
     if quiet is not None:
         flags = (flags | 0x10) if quiet else (flags & ~0x10)
     if turbo is not None:
@@ -361,4 +394,19 @@ def build_control(
     if not beeper:
         flags |= 0x80
     c[5] = flags
+    return build_hon_frame(FRAME_CONTROL, SUB_SET_GROUP.to_bytes(2, "big") + bytes(c))
+
+
+def build_cleaning(status: HonStatus, *, steri: bool) -> bytes:
+    """Start self cleaning, or steri cleaning (56 °C), like ESPHome does."""
+    c = bytearray(status.control)
+    c[0] = 0x06  # 22 °C
+    c[1] = (c[1] & 0xF0) | SWING_V_CENTER
+    c[7] = (c[7] & 0xF8) | SWING_H_CENTER
+    c[2] = (c[2] & 0x1F) | (MODE_DRY << 5)
+    c[5] = (c[5] | 0x01) & ~0x80  # power on, beep
+    c[4] = (c[4] | 0x80) if steri else (c[4] & ~0x80)
+    c[9] = (c[9] & ~0x20) & ~0x10  # light off, self clean off
+    if not steri:
+        c[9] |= 0x10
     return build_hon_frame(FRAME_CONTROL, SUB_SET_GROUP.to_bytes(2, "big") + bytes(c))

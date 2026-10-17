@@ -8,6 +8,8 @@ from typing import Any
 
 from .protocol import (
     BIG_DATA_QUERY,
+    CONTROL_LEN,
+    SENSORS_LEN,
     FRAME_INVALID,
     STATUS_QUERY,
     SUB_BIG_DATA_REPLY,
@@ -21,6 +23,7 @@ from .protocol import (
     HonStatus,
     KzwStreamParser,
     ProtocolError,
+    build_cleaning,
     build_control,
     build_power,
     decode_status,
@@ -39,6 +42,9 @@ COMMAND_GAP = 0.15  # the key is fragile: one command at a time, small gap
 POLL_INTERVAL = 10.0  # the key drops a connection after ~17 s without a request (measured)
 SILENCE_TIMEOUT = POLL_INTERVAL * 3
 MAX_BACKOFF = 60.0
+# A brief reconnect keeps the entity available; it only turns unavailable after this long offline.
+# Shared Wi-Fi/NAT hiccups drop every key for a few seconds, which should not flap the dashboard.
+AVAILABILITY_GRACE = 90.0
 
 
 class CommandError(Exception):
@@ -58,6 +64,10 @@ class HonKzwClient:
         self.big: HonBigData | None = None  # power, compressor... (if the unit answers)
         self._big_supported = True
         self._big_failures = 0
+        # Some units (e.g. Thermor Nagano) leave the power field at 0 even with the compressor
+        # running: None = unknown yet, True = reported, False = not reported by this unit
+        self.power_reported: bool | None = None
+        self._zero_power_while_running = 0
         self._listeners: list[Callable[[], None]] = []
         self._writer: asyncio.StreamWriter | None = None
         self._pending: dict[int, asyncio.Future[HonMessage]] = {}
@@ -65,8 +75,10 @@ class HonKzwClient:
         self._seq = 0
         self._ready = asyncio.Event()
         self._closing = False
+        self._backoff = 5.0
+        self._offline_since: float | None = None
 
-    # -- listeners -----------------------------------------------------------------
+    # listeners
     def add_listener(self, callback: Callable[[], None]) -> Callable[[], None]:
         self._listeners.append(callback)
         return lambda: self._listeners.remove(callback)
@@ -81,25 +93,29 @@ class HonKzwClient:
             _LOGGER.info("%s (%s) %s", self.host, self.mac, "available" if value else "unavailable")
             self._notify()
 
-    # -- connection loop -----------------------------------------------------------
+    # connection loop
     async def wait_ready(self, timeout: float) -> None:
         await asyncio.wait_for(self._ready.wait(), timeout)
 
     async def run(self) -> None:
         """Keep a connection open forever, reconnecting with backoff."""
-        backoff = 5.0
         while not self._closing:
             try:
                 await self._session()
-                backoff = 5.0
             except (OSError, asyncio.TimeoutError, ConnectionError) as err:
                 _LOGGER.debug("%s: connection lost: %r", self.host, err)
             finally:
                 self._teardown()
             if self._closing:
                 break
-            await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, MAX_BACKOFF)
+            # Stay available through a quick reconnect; mark unavailable only after the grace.
+            now = asyncio.get_running_loop().time()
+            if self._offline_since is None:
+                self._offline_since = now
+            if now - self._offline_since >= AVAILABILITY_GRACE:
+                self._set_available(False)
+            await asyncio.sleep(self._backoff)
+            self._backoff = min(self._backoff * 2, MAX_BACKOFF)
 
     async def stop(self) -> None:
         self._closing = True
@@ -113,7 +129,8 @@ class HonKzwClient:
             if not future.done():
                 future.set_exception(ConnectionError("connection closed"))
         self._pending.clear()
-        self._set_available(False)
+        if self._closing:
+            self._set_available(False)
 
     async def _session(self) -> None:
         reader, self._writer = await asyncio.wait_for(
@@ -170,8 +187,14 @@ class HonKzwClient:
                 _LOGGER.debug("%s: control %s", self.host, status.control.hex(" "))
             self.status = status
             if status.big is not None:
+                if self.big is None or status.big != self.big:
+                    raw = msg.payload[CONTROL_LEN + SENSORS_LEN:]
+                    _LOGGER.debug("%s: big data %s (%s)", self.host, raw.hex(" "), status.big)
                 self.big = status.big
+                self._check_power_reporting(status.big)
             self._ready.set()
+            self._offline_since = None
+            self._backoff = 5.0
             self._set_available(True)
             self._notify()
         elif msg.frame_type == FRAME_INVALID:
@@ -179,6 +202,15 @@ class HonKzwClient:
         future = self._pending.pop(seq, None) if seq else None
         if future is not None and not future.done():
             future.set_result(msg)
+
+    def _check_power_reporting(self, big: HonBigData) -> None:
+        if big.power > 0:
+            self.power_reported = True
+        elif big.compressor_frequency > 0 and self.power_reported is None:
+            self._zero_power_while_running += 1
+            if self._zero_power_while_running >= 3:
+                self.power_reported = False
+                _LOGGER.info("%s: unit does not report its power consumption", self.host)
 
     async def _request(self, hon: bytes) -> HonMessage:
         async with self._lock:
@@ -199,7 +231,7 @@ class HonKzwClient:
             raise CommandError("frame rejected by the unit")
         return msg
 
-    # -- commands ------------------------------------------------------------------
+    # commands
     async def _command(self, hon: bytes) -> None:
         try:
             msg = await self._request(hon)
@@ -216,7 +248,13 @@ class HonKzwClient:
             # the single-parameter power command has no beeper flag
             await self.async_control(power=on)
 
-    async def async_control(self, **changes: Any) -> None:
+    async def async_start_cleaning(self, *, steri: bool) -> None:
+        if self.status is None:
+            raise CommandError("state not known yet")
+        await self._command(build_cleaning(self.status, steri=steri))
+
+    async def async_control(self, *, silent: bool = False, **changes: Any) -> None:
+        """Send a group control command; silent=True never beeps (e.g. display changes)."""
         if self.status is None:
             raise CommandError("state not known yet")
         await self._command(
@@ -224,7 +262,7 @@ class HonKzwClient:
                 self.status,
                 fixed_vertical_position=self.last_vertical_position,
                 fixed_horizontal_position=self.last_horizontal_position,
-                beeper=self.beeper,
+                beeper=self.beeper and not silent,
                 **changes,
             )
         )

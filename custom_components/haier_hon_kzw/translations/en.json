@@ -66,6 +66,14 @@
               "horizontal": "Horizontal",
               "both": "Both"
             }
+          },
+          "preset_mode": {
+            "name": "Preset",
+            "state": {
+              "none": "None",
+              "sleep": "Sleep",
+              "away": "Frost protection 10 °C"
+            }
           }
         }
       }
@@ -98,14 +106,14 @@
       "outdoor_coil_temperature": {
         "name": "Outdoor coil temperature"
       },
-      "outdoor_out_air_temperature": {
-        "name": "Outdoor exhaust air temperature"
-      },
       "outdoor_defrost_temperature": {
         "name": "Defrost temperature"
       },
       "expansion_valve": {
         "name": "Expansion valve opening"
+      },
+      "discharge_temperature": {
+        "name": "Discharge temperature"
       }
     },
     "select": {
@@ -140,6 +148,31 @@
       },
       "beeper": {
         "name": "Command beep"
+      },
+      "health": {
+        "name": "Ionizer (health)"
+      },
+      "lock_remote": {
+        "name": "Remote control lock"
+      }
+    },
+    "button": {
+      "self_cleaning": {
+        "name": "Self cleaning"
+      },
+      "steri_cleaning": {
+        "name": "Steri cleaning 56 °C"
+      }
+    },
+    "binary_sensor": {
+      "filter": {
+        "name": "Filter needs cleaning"
+      },
+      "cleaning": {
+        "name": "Cleaning running"
+      },
+      "compressor": {
+        "name": "Compressor"
       }
     }
   },

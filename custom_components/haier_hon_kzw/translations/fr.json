@@ -66,6 +66,14 @@
               "horizontal": "Horizontale",
               "both": "Les deux"
             }
+          },
+          "preset_mode": {
+            "name": "Préréglage",
+            "state": {
+              "none": "Aucun",
+              "sleep": "Nuit",
+              "away": "Hors-gel 10 °C"
+            }
           }
         }
       }
@@ -98,14 +106,14 @@
       "outdoor_coil_temperature": {
         "name": "Température échangeur extérieur"
       },
-      "outdoor_out_air_temperature": {
-        "name": "Température air soufflé extérieur"
-      },
       "outdoor_defrost_temperature": {
         "name": "Température de dégivrage"
       },
       "expansion_valve": {
         "name": "Ouverture vanne d'expansion"
+      },
+      "discharge_temperature": {
+        "name": "Température de refoulement"
       }
     },
     "select": {
@@ -140,6 +148,31 @@
       },
       "beeper": {
         "name": "Bip des commandes"
+      },
+      "health": {
+        "name": "Ioniseur (santé)"
+      },
+      "lock_remote": {
+        "name": "Verrouillage de la télécommande"
+      }
+    },
+    "button": {
+      "self_cleaning": {
+        "name": "Autonettoyage"
+      },
+      "steri_cleaning": {
+        "name": "Stérilisation 56 °C"
+      }
+    },
+    "binary_sensor": {
+      "filter": {
+        "name": "Filtre à nettoyer"
+      },
+      "cleaning": {
+        "name": "Nettoyage en cours"
+      },
+      "compressor": {
+        "name": "Compresseur"
       }
     }
   },

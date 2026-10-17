@@ -17,7 +17,46 @@ from .entity import HonKzwEntity
 
 async def async_setup_entry(hass: HomeAssistant, entry: HonKzwConfigEntry, async_add_entities) -> None:
     client = entry.runtime_data
-    async_add_entities([HonKzwDisplay(client, entry), HonKzwBeeper(client, entry)])
+    async_add_entities(
+        [
+            HonKzwDisplay(client, entry),
+            HonKzwBeeper(client, entry),
+            HonKzwFlagSwitch(client, entry, "health", "health", None),
+            HonKzwFlagSwitch(client, entry, "lock_remote", "lock_remote", EntityCategory.CONFIG),
+        ]
+    )
+
+
+class HonKzwFlagSwitch(HonKzwEntity, SwitchEntity):
+    """An on/off setting of the unit (ionizer, remote lock)."""
+
+    def __init__(self, client, entry, key: str, attr: str, category: EntityCategory | None) -> None:
+        super().__init__(client, entry)
+        self._attr = attr
+        self._attr_translation_key = key
+        self._attr_entity_category = category
+        self._attr_unique_id = f"{client.mac}_{key}"
+
+    @property
+    def is_on(self) -> bool | None:
+        status = self._client.status
+        return getattr(status, self._attr) if status else None
+
+    async def _set(self, on: bool) -> None:
+        try:
+            await self._client.async_control(**{self._attr: on})
+        except CommandError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self._set(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self._set(False)
 
 
 class HonKzwDisplay(HonKzwEntity, SwitchEntity):
@@ -34,7 +73,8 @@ class HonKzwDisplay(HonKzwEntity, SwitchEntity):
 
     async def _set(self, on: bool) -> None:
         try:
-            await self._client.async_control(display=on)
+            # display changes are often automated (e.g. at night): never beep
+            await self._client.async_control(display=on, silent=True)
         except CommandError as err:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,

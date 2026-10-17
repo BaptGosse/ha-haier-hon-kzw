@@ -32,6 +32,7 @@ MAX_INTEGRATION_GAP = 300  # s; longer gaps (outage, restart) are not integrated
 class HonKzwSensorDescription(SensorEntityDescription):
     value: Callable[[HonKzwClient], float | int | None]
     big_data: bool = False
+    needs_power: bool = False  # unavailable when the unit does not report its power
 
 
 def _status(attr: str) -> Callable[[HonKzwClient], float | int | None]:
@@ -42,7 +43,7 @@ def _big(attr: str) -> Callable[[HonKzwClient], float | int | None]:
     return lambda c: getattr(c.big, attr) if c.big else None
 
 
-def _temperature(key: str, value, *, diagnostic: bool = False, enabled: bool = True) -> HonKzwSensorDescription:
+def _temperature(key: str, value, *, diagnostic: bool = False) -> HonKzwSensorDescription:
     return HonKzwSensorDescription(
         key=key,
         translation_key=key,
@@ -50,7 +51,6 @@ def _temperature(key: str, value, *, diagnostic: bool = False, enabled: bool = T
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         entity_category=EntityCategory.DIAGNOSTIC if diagnostic else None,
-        entity_registry_enabled_default=enabled,
         value=value,
         big_data=diagnostic,
     )
@@ -71,6 +71,7 @@ SENSORS = (
         native_unit_of_measurement=UnitOfPower.WATT,
         value=_big("power"),
         big_data=True,
+        needs_power=True,
     ),
     HonKzwSensorDescription(
         key="compressor_frequency",
@@ -89,20 +90,20 @@ SENSORS = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
         value=_big("compressor_current"),
         big_data=True,
     ),
     _temperature("indoor_coil_temperature", _big("indoor_coil_temperature"), diagnostic=True),
     _temperature("outdoor_coil_temperature", _big("outdoor_coil_temperature"), diagnostic=True),
-    _temperature("outdoor_out_air_temperature", _big("outdoor_out_air_temperature"), diagnostic=True, enabled=False),
-    _temperature("outdoor_defrost_temperature", _big("outdoor_defrost_temperature"), diagnostic=True, enabled=False),
+    # big data byte 3: called "outdoor out air" by ESPHome, but on the units tested it rises above the
+    # indoor coil while heating and stays hot after the compressor stops: compressor discharge temperature
+    _temperature("discharge_temperature", _big("outdoor_out_air_temperature"), diagnostic=True),
+    _temperature("outdoor_defrost_temperature", _big("outdoor_defrost_temperature"), diagnostic=True),
     HonKzwSensorDescription(
         key="expansion_valve",
         translation_key="expansion_valve",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
         value=_big("expansion_valve"),
         big_data=True,
     ),
@@ -133,6 +134,8 @@ class HonKzwSensor(HonKzwEntity, SensorEntity):
     @property
     def available(self) -> bool:
         if self.entity_description.big_data and self._client.big is None:
+            return False
+        if self.entity_description.needs_power and self._client.power_reported is False:
             return False
         return super().available
 
@@ -181,6 +184,8 @@ class HonKzwEnergySensor(HonKzwEntity, RestoreSensor):
 
     @property
     def available(self) -> bool:
+        if self._client.power_reported is False:
+            return False
         return self._client.big is not None and super().available
 
     @property
