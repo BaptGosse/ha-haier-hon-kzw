@@ -5,9 +5,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_MAC, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .client import HonKzwClient
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_UPDATE
 
 PLATFORMS = [
     Platform.BINARY_SENSOR,
@@ -35,8 +36,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: HonKzwConfigEntry) -> bo
         ) from err
     entry.runtime_data = client
     entry.async_on_unload(client.stop)
+    # units of one outdoor unit share its estimate: any update refreshes them all
+    entry.async_on_unload(client.add_listener(lambda: async_dispatcher_send(hass, SIGNAL_UPDATE)))
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: HonKzwConfigEntry) -> None:
+    async_dispatcher_send(hass, SIGNAL_UPDATE)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: HonKzwConfigEntry) -> bool:

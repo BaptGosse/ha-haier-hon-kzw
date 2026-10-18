@@ -114,6 +114,18 @@
       },
       "discharge_temperature": {
         "name": "Température de refoulement"
+      },
+      "estimated_power": {
+        "name": "Puissance estimée"
+      },
+      "thermal_power": {
+        "name": "Puissance thermique"
+      },
+      "estimated_energy": {
+        "name": "Énergie estimée"
+      },
+      "estimated_cop": {
+        "name": "COP estimé"
       }
     },
     "select": {
@@ -274,6 +286,24 @@
         "health": {
           "name": "Ioniseur (santé)",
           "description": "Allume ou éteint l'ioniseur."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Estimation de la consommation",
+        "description": "Les unités qui ne transmettent pas leur consommation ont une estimation calculée à partir de la fréquence du compresseur et des températures des échangeurs (modèle calé sur le groupe extérieur Haier 2U50S2SM1FA, vendu par Thermor comme NAGANO BI 5000).",
+        "data": {
+          "outdoor_unit": "Groupe extérieur",
+          "indoor_fan_power": "Puissance de l'unité intérieure",
+          "power_calibration": "Calage de la puissance"
+        },
+        "data_description": {
+          "outdoor_unit": "Donnez le même nom aux unités qui partagent un groupe extérieur (multi-split), par exemple « groupe 2 ». Laissez vide pour une unité seule sur son groupe.",
+          "indoor_fan_power": "Consommée par l'unité intérieure (ventilateur et électronique) quand elle est en marche.",
+          "power_calibration": "Multiplie la puissance estimée du compresseur, pour coller à une vraie mesure (1,00 = modèle tel que calé)."
         }
       }
     }

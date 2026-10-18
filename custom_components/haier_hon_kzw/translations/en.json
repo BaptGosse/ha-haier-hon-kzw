@@ -114,6 +114,18 @@
       },
       "discharge_temperature": {
         "name": "Discharge temperature"
+      },
+      "estimated_power": {
+        "name": "Estimated power"
+      },
+      "thermal_power": {
+        "name": "Thermal power"
+      },
+      "estimated_energy": {
+        "name": "Estimated energy"
+      },
+      "estimated_cop": {
+        "name": "Estimated COP"
       }
     },
     "select": {
@@ -274,6 +286,24 @@
         "health": {
           "name": "Ionizer (health)",
           "description": "Turns the ionizer on or off."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Consumption estimate",
+        "description": "Units that do not report their consumption get an estimate computed from the compressor frequency and the coil temperatures (model calibrated on the Haier 2U50S2SM1FA outdoor unit, sold by Thermor as NAGANO BI 5000).",
+        "data": {
+          "outdoor_unit": "Outdoor unit",
+          "indoor_fan_power": "Indoor unit power",
+          "power_calibration": "Power calibration"
+        },
+        "data_description": {
+          "outdoor_unit": "Give the same name to the units that share one outdoor unit (multi-split), for example \"outdoor 2\". Leave empty for a unit alone on its outdoor unit.",
+          "indoor_fan_power": "Used by the indoor unit (fan and electronics) while it is on.",
+          "power_calibration": "Multiplies the estimated compressor power, to match a real measurement (1.00 = model as calibrated)."
         }
       }
     }

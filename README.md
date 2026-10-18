@@ -68,7 +68,8 @@ For each heat pump:
 | **Self cleaning** and **Steri cleaning 56 °C** | Buttons that start the indoor unit's cleaning cycles. |
 | **Filter needs cleaning**, **Cleaning running**, **Compressor** | On/off states for alerts and automations. |
 | **Temperatures** | Indoor, and outdoor (outdoor unit sensor). |
-| **Power (W)** and **Energy (kWh)** | Live and cumulative consumption, ready for the Home Assistant **Energy** dashboard, **when the unit reports it**. Thermor Nagano units leave this field at 0. The integration detects it (compressor running, 0 W) and marks both sensors unavailable instead of showing a false 0. Compressor frequency and coil temperatures stay available to build an estimate. |
+| **Power (W)** and **Energy (kWh)** | Live and cumulative consumption, ready for the Home Assistant **Energy** dashboard, **when the unit reports it**. Thermor Nagano units leave this field at 0. The integration detects it (compressor running, 0 W) and marks both sensors unavailable instead of showing a false 0. |
+| **Estimated power, energy, thermal power and COP** | For units that don't report their consumption: a physical estimate from the compressor frequency and the coil temperatures, shared between the indoor units of a multi-split. See [Consumption estimate](#consumption-estimate). |
 | **Diagnostics** | Compressor frequency and current, indoor and outdoor coil, defrost and compressor discharge temperatures, expansion valve opening, error code. |
 
 Everything can be used in Home Assistant automations and scripts. For example, you can turn the
@@ -125,6 +126,46 @@ customize:
             options: [{value: quiet, name: Quiet}, {value: auto, name: Auto}, {value: turbo, name: Turbo}]
 ```
 
+## Consumption estimate
+
+Thermor Nagano units report neither their power nor their compressor current. The integration estimates them
+from what the units do report, with a physical model of the outdoor unit. Each unit gets four sensors:
+
+| Sensor | Meaning |
+|-|-|
+| **Estimated power** (W) | Electricity used for this room: its share of the outdoor unit, plus its indoor fan |
+| **Estimated energy** (kWh) | The same, integrated over time. Add it to the **Energy** dashboard, with your price per kWh. |
+| **Thermal power** (W) | Heat (or cooling) delivered to the room |
+| **Estimated COP** | Heat delivered per unit of electricity, for the whole outdoor unit |
+
+**Multi-split outdoor units.** In each unit's options (**Settings → Devices & services → Haier hOn local →
+Configure**), give the same **outdoor unit** name to the units that share one outdoor unit, for example
+`outdoor 2`. The compressor is then counted once and shared by expansion valve opening between the units that use
+it, so nothing is counted twice. Leave it empty for a unit alone on its outdoor unit.
+
+**How it works.** Electrical power and heat come from the same energy balance on the R32 refrigerant:
+
+```
+mass flow    m = f × D × ρ_suction(T_evap) × (1 − 0.02 × (pressure ratio − 1))
+compressor   P = m × Δh_isentropic(T_evap, T_cond) / η(f)
+heat         Q = m × (h_vapour − h_liquid) + 93 % of P        (heating)
+outdoor unit P + outdoor fan + controller
+```
+
+- When heating, the **condensing temperature** is the indoor coil of the units that are heating. In a multi-split,
+  the coil of a unit that is off reads hot discharge gas, and is ignored.
+- No probe reads the **evaporating temperature** in steady state: the outdoor coil and defrost probes read the coil
+  outlet, close to the outdoor air. So it is derived from the outdoor temperature and the heat taken from the air.
+- The model is calibrated on the **Haier 2U50S2SM1FA** service manual (Thermor NAGANO BI 5000). It matches the
+  nominal heating point (4.7 kW for 1.40 kW: model 1.38 kW), the minimum and maximum capacities within 8 %, the
+  SCOP (4.0: model 3.96) and the nominal cooling point.
+- Expected accuracy is about **±15 % when heating**. Cooling at low load is optimistic for now.
+
+**Calibration.** If you can measure the real consumption once (a clamp meter on the outdoor unit, or your
+electricity meter with everything else off), set **Power calibration** in the unit's options to
+`current calibration × measured / estimated`. It applies to the compressor of that unit's share. Other outdoor
+units than the 2U50S2SM1FA can be brought closer the same way.
+
 ## Installation
 
 1. Click the **Open in HACS** button above, or in HACS → ⋮ → **Custom repositories** add
@@ -139,8 +180,9 @@ integration entry.
 
 ### Tracking the cost of each heat pump
 
-In **Settings → Dashboards → Energy**, add each unit's **Energy** sensor as a consumption source,
-with a price per kWh. The price can be a fixed number or, better, a number helper that you update
+In **Settings → Dashboards → Energy**, add each unit's **Energy** sensor as a consumption source (or its
+**Estimated energy** sensor if the unit does not report its consumption, like the Thermor Nagano), with a
+price per kWh. The price can be a fixed number or, better, a number helper that you update
 when your tariff changes. The Energy dashboard then shows kWh and cost per day, week, month or year.
 
 ## Tips

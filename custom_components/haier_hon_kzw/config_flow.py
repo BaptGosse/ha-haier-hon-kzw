@@ -5,13 +5,22 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_HOST, CONF_MAC, CONF_NAME
+from homeassistant.core import callback
+from homeassistant.helpers import selector
 from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from .client import async_probe
-from .const import DOMAIN
+from .const import (
+    CONF_INDOOR_FAN_POWER,
+    CONF_OUTDOOR_UNIT,
+    CONF_POWER_CALIBRATION,
+    DEFAULT_INDOOR_FAN_POWER,
+    DEFAULT_POWER_CALIBRATION,
+    DOMAIN,
+)
 from .protocol import ProtocolError, normalize_mac
 
 
@@ -27,6 +36,11 @@ async def _probe_error(host: str, mac: str) -> str | None:
 
 class HonKzwConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        return HonKzwOptionsFlow()
 
     def __init__(self) -> None:
         self._discovered: dict[str, str] = {}
@@ -102,3 +116,34 @@ class HonKzwConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema({vol.Required(CONF_HOST, default=entry.data[CONF_HOST]): str}),
             errors=errors,
         )
+
+
+class HonKzwOptionsFlow(OptionsFlow):
+    """Consumption estimate: shared outdoor unit, indoor fan power and calibration."""
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        if user_input is not None:
+            user_input[CONF_OUTDOOR_UNIT] = user_input.get(CONF_OUTDOOR_UNIT, "").strip()
+            return self.async_create_entry(data=user_input)
+        options = self.config_entry.options
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_OUTDOOR_UNIT,
+                    description={"suggested_value": options.get(CONF_OUTDOOR_UNIT, "")},
+                ): selector.TextSelector(),
+                vol.Required(
+                    CONF_INDOOR_FAN_POWER, default=options.get(CONF_INDOOR_FAN_POWER, DEFAULT_INDOOR_FAN_POWER)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=100, step=1, unit_of_measurement="W",
+                                                  mode=selector.NumberSelectorMode.BOX)
+                ),
+                vol.Required(
+                    CONF_POWER_CALIBRATION,
+                    default=options.get(CONF_POWER_CALIBRATION, DEFAULT_POWER_CALIBRATION),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.5, max=1.5, step=0.01, mode=selector.NumberSelectorMode.BOX)
+                ),
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)
